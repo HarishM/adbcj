@@ -5,10 +5,12 @@ import org.adbcj.postgresql.codec.frontend.SimpleFrontendMessage;
 import org.adbcj.postgresql.codec.frontend.FrontendMessageType;
 import org.adbcj.postgresql.codec.backend.AbstractBackendMessage;
 import org.adbcj.postgresql.codec.backend.AuthenticationMessage;
+import org.adbcj.postgresql.codec.backend.BackendMessageType;
 import org.adbcj.postgresql.codec.backend.CommandCompleteMessage;
 import org.adbcj.postgresql.codec.backend.DataRowMessage;
 import org.adbcj.postgresql.codec.backend.ErrorResponseMessage;
 import org.adbcj.postgresql.codec.backend.KeyMessage;
+import org.adbcj.postgresql.codec.backend.ParameterDescriptionMessage;
 import org.adbcj.postgresql.codec.backend.ReadyMessage;
 import org.adbcj.postgresql.codec.backend.RowDescriptionMessage;
 import org.adbcj.support.AbstractDbSession;
@@ -32,13 +34,15 @@ public class ProtocolHandler {
 
 	private final Logger logger = LoggerFactory.getLogger(ProtocolHandler.class);
 
-	private final AbstractConnectionManager connectionManager;
+	private final AbstractPgConnectionManager connectionManager;
 
-	public ProtocolHandler(AbstractConnectionManager connectionManager) {
+	private BackendMessageType lastCommand = null;
+	
+	public ProtocolHandler(AbstractPgConnectionManager connectionManager) {
 		this.connectionManager = connectionManager;
 	}
 
-	public void connectionOpened(AbstractConnection connection) {
+	public void connectionOpened(AbstractPgConnection connection) {
 		Map<ConfigurationVariable, String> parameters = new HashMap<ConfigurationVariable, String>();
 		parameters.put(ConfigurationVariable.CLIENT_ENCODING, "UNICODE");
 		parameters.put(ConfigurationVariable.DATE_STYLE, "ISO");
@@ -46,11 +50,11 @@ public class ProtocolHandler {
 	}
 
 	// TODO Rename to connectionClosed
-	public void closeConnection(AbstractConnection connection) {
+	public void closeConnection(AbstractPgConnection connection) {
 		connection.finalizeClose();
 	}
 
-	public void handleException(AbstractConnection connection, Throwable cause) {
+	public void handleException(AbstractPgConnection connection, Throwable cause) {
 		if (connection != null) {
 			DefaultDbFuture<?> future = connection.getConnectFuture();
 			if (future != null && !future.isDone()) {
@@ -76,7 +80,7 @@ public class ProtocolHandler {
 		cause.printStackTrace();
 	}
 
-	private void errorOutFuture(AbstractConnection connection, DefaultDbFuture<?> future, Throwable cause) {
+	private void errorOutFuture(AbstractPgConnection connection, DefaultDbFuture<?> future, Throwable cause) {
 		logger.debug("Erroring out future: {}", future);
 		if (!future.isDone()) {
 			future.setException(DbException.wrap(connection, cause));
@@ -84,7 +88,7 @@ public class ProtocolHandler {
 	}
 
 
-	public void handleMessage(AbstractConnection connection, AbstractBackendMessage message) {
+	public void handleMessage(AbstractPgConnection connection, AbstractBackendMessage message) {
 		// TODO Implement handling remaining backend message types
 		switch(message.getType()) {
 		case AUTHENTICATION:
@@ -120,12 +124,19 @@ public class ProtocolHandler {
 		case ROW_DESCRIPTION:
 			doRowDescription(connection, (RowDescriptionMessage)message);
 			break;
+		case PARAMETER_DESCRIPTION:
+			doParameterDescription(connection, (ParameterDescriptionMessage)message);
+			break;
+		case CLOSE_COMPLETE:
+			AbstractDbSession.Request<Void> request = connection.getActiveRequest();
+			request.complete(null);
+			break;
 		default:
 			throw new IllegalStateException("Need to implement handler for messages of type " + message.getType());
 		}
 	}
 
-	private void doAuthentication(AbstractConnection connection, AuthenticationMessage authenticationMessage) {
+	private void doAuthentication(AbstractPgConnection connection, AuthenticationMessage authenticationMessage) {
 		// TODO Support all postgresql authentication types
 		switch (authenticationMessage.getAuthenticaitonType()) {
 		case OK:
@@ -145,7 +156,16 @@ public class ProtocolHandler {
 		}
 	}
 
-	private void doCommandComplete(AbstractConnection connection, CommandCompleteMessage commandCompleteMessage) {
+	private void doParameterDescription(AbstractPgConnection connection, ParameterDescriptionMessage Message) {
+		this.lastCommand = BackendMessageType.PARAMETER_DESCRIPTION;
+		AbstractDbSession.Request<PgPreparedStatement> request = connection.getActiveRequest();
+		PgPreparedStatement prepareStatement = (PgPreparedStatement) request.getAccumulator();
+		prepareStatement.setParamCount(Message.getParamCount());
+		prepareStatement.setParamOID(Message.getParamOID());
+		request.complete(prepareStatement);
+	}
+	
+	private void doCommandComplete(AbstractPgConnection connection, CommandCompleteMessage commandCompleteMessage) {
 		AbstractDbSession.Request<Object> request = connection.getActiveRequest();
 		if (request == null) {
 			throw new IllegalStateException("Received a data row without an active request");
@@ -173,7 +193,7 @@ public class ProtocolHandler {
 		}
 	}
 
-	private void doDataRow(AbstractConnection connection, DataRowMessage dataRowMessage) {
+	private void doDataRow(AbstractPgConnection connection, DataRowMessage dataRowMessage) {
 		AbstractDbSession.Request<Object> request = connection.getActiveRequest();
 		if (request == null) {
 			throw new IllegalStateException("Received a data row without an active request");
@@ -188,12 +208,12 @@ public class ProtocolHandler {
 
 	/**
 	 * When an error packet is received, a PgException is created and thrown.  The exception is then handled by
-	 * {@link #handleException(AbstractConnection, Throwable)}}
+	 * {@link #handleException(AbstractPgConnection, Throwable)}}
 	 *
 	 * @param connection  the session under which the exception occurred
 	 * @param errorResponseMessage  the message containing the exception
 	 */
-	private void doError(AbstractConnection connection, ErrorResponseMessage errorResponseMessage) {
+	private void doError(AbstractPgConnection connection, ErrorResponseMessage errorResponseMessage) {
 		// When receiving an error packet, throw exception and let exceptionCaught notify future
 		String message = errorResponseMessage.getFields().get(ErrorField.MESSAGE);
 		DbException exception;
@@ -205,12 +225,12 @@ public class ProtocolHandler {
 		throw exception;
 	}
 
-	private void doKey(AbstractConnection connection, KeyMessage backendMessage) {
+	private void doKey(AbstractPgConnection connection, KeyMessage backendMessage) {
 		connection.setKey(backendMessage.getKey());
 		connection.setPid(backendMessage.getPid());
 	}
 
-	private void doReadyForQuery(AbstractConnection connection, ReadyMessage backendMessage) {
+	private void doReadyForQuery(AbstractPgConnection connection, ReadyMessage backendMessage) {
 		// Check if we're doing connection
 		DefaultDbFuture<Connection> future = connection.getConnectFuture();
 		if (!future.isDone()) {
@@ -232,12 +252,17 @@ public class ProtocolHandler {
 		}
 	}
 
-	private void doRowDescription(AbstractConnection connection, RowDescriptionMessage rowDescriptionMessage) {
+	private void doRowDescription(AbstractPgConnection connection, RowDescriptionMessage rowDescriptionMessage) {
 		AbstractDbSession.Request<Object> request = connection.getActiveRequest();
-		if (request == null) {
+		if (request == null && this.lastCommand == null) {
 			throw new IllegalStateException("Received a row description without an active request");
 		}
-		//logger.debug("Received row description for request {}", request);
+		else if(this.lastCommand == BackendMessageType.PARAMETER_DESCRIPTION){
+			this.lastCommand = null;
+			return;
+		}
+		
+		logger.debug("Received row description for request {}", request);
 
 		request.getEventHandler().startFields(request.getAccumulator());
 		for (Field field : rowDescriptionMessage.getFields()) {
@@ -246,5 +271,4 @@ public class ProtocolHandler {
 		request.getEventHandler().endFields(request.getAccumulator());
 		request.getEventHandler().startResults(request.getAccumulator());
 	}
-
 }
