@@ -17,6 +17,7 @@
 package org.adbcj.postgresql.codec.backend;
 
 import java.nio.charset.Charset;
+import java.sql.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -120,23 +121,21 @@ public class BackendMessageDecoder {
 			return decodeReadyForQuery(input);
 		case ROW_DESCRIPTION:
 			return decodeRowDescription(input);
+		case PARAMETER_DESCRIPTION:
+			return decodeParameterDescription(input);
 		case COPY_DATA:
 		case COPY_IN_RESPONSE:
 		case COPY_OUT_RESPONSE:
 		case FUNCTION_CALL_RESPONSE:
 		case NOTICE_RESPONSE:
 		case NOTIFICATION_RESPONSE:
-		case PARAMETER_DESCRIPTION:
 		case PASSWORD:
 			// TODO Implement decoder for these backend message types
 			throw new IllegalStateException("No decoder implemented for message of type " + type);
 		default:
 			throw new IllegalStateException(String.format("Messages of type %s are not implemented", typeValue));
 		}
-
-
 	}
-
 
 	private AuthenticationMessage decodeAuthentication(DecoderInputStream input) throws IOException {
 		// Get authentication type
@@ -191,10 +190,19 @@ public class BackendMessageDecoder {
 		} else if (matcher.group(2).length() > 0) {
 			count = Long.valueOf(matcher.group(2));
 		}
-
 		return new CommandCompleteMessage(command, count, oid);
 	}
 
+	private ParameterDescriptionMessage decodeParameterDescription(DecoderInputStream input) throws IOException{
+		int paramCount = input.readUnsignedShort();
+		int paramOID[] = new int[paramCount];
+		
+		for(int i=0 ; i<paramCount ; i++){
+			paramOID[i] = input.readInt();
+		}
+		return new ParameterDescriptionMessage(paramCount, paramOID);
+	}
+	
 	private DataRowMessage decodeDataRow(DecoderInputStream input) throws IOException {
 		Charset charset = connectionState.getBackendCharset();
 		PgField[] fields = connectionState.getCurrentResultSetFields();
@@ -239,9 +247,77 @@ public class BackendMessageDecoder {
 						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
 					}
 					break;
+				case CHAR:
 				case VARCHAR:
 					strVal = input.readString(valueLength, charset);
 					value = new DefaultValue(field, strVal);
+					break;
+				case SMALLINT:
+					switch(field.getFormatCode()){
+					case BINARY:
+						value = new DefaultValue(field, input.readShort());
+						break;
+					case TEXT:
+						strVal = input.readString(valueLength, charset);
+						value = new DefaultValue(field, Long.valueOf(strVal));
+						break;
+					default:
+						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
+					}
+					break;
+				case DATE:	
+					switch(field.getFormatCode()){
+					case TEXT:
+						strVal = input.readString(valueLength, charset);
+						value = new DefaultValue(field, Date.valueOf(strVal));
+						break;
+					case BINARY:
+					default:
+						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
+					}
+					break;
+				case REAL:
+					switch(field.getFormatCode()){
+					case TEXT:
+						strVal = input.readString(valueLength, charset);
+						value = new DefaultValue(field, Float.valueOf(strVal));
+						break;
+					case BINARY:
+					default:
+						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
+					}
+					break;
+				case DOUBLE:
+					switch(field.getFormatCode()){
+					case TEXT:
+						strVal = input.readString(valueLength, charset);
+						value = new DefaultValue(field, Double.valueOf(strVal));
+						break;
+					case BINARY:
+					default:
+						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
+					}
+					break;
+				case BOOLEAN:
+					strVal = input.readString(valueLength, charset);
+					value = new DefaultValue(field, (strVal.equals("t"))?true:false);
+					break;
+				case TIMESTAMP:	
+					switch(field.getFormatCode()){
+					case TEXT:
+						strVal = input.readString(valueLength, charset);
+						PgTimestamp timestamp = new PgTimestamp();
+						timestamp.setTimestamp(strVal);
+						value = new DefaultValue(field, timestamp);
+						break;
+					case BINARY:
+					default:
+						throw new IllegalStateException("Unable to decode format of " + field.getFormatCode());
+					}
+					break;
+				case BLOB:
+					StringBuffer text = input.readStringBuffer(valueLength, charset);
+					value = new DefaultValue(field, text);
 					break;
 				default:
 					// Advance buffer
@@ -322,7 +398,6 @@ public class BackendMessageDecoder {
 			short typeSize = input.readShort();
 			int typeModifier = input.readInt();
 			FormatCode code = FormatCode.values()[input.readShort()];
-
 			Type type;
 			switch (typeOid) {
 			case PgFieldType.BOOLEAN:
@@ -351,6 +426,13 @@ public class BackendMessageDecoder {
 				break;
 			case PgFieldType.VARCHAR:
 				type = Type.VARCHAR;
+				break;
+			case PgFieldType.TIMESTAMP_WITH_TIME_ZONE:
+			case PgFieldType.TIMESTAMP:
+				type = Type.TIMESTAMP;
+				break;
+			case PgFieldType.TEXT:
+				type = Type.BLOB;
 				break;
 			default:
 				// TODO Convert more typeOids to ADBCJ types

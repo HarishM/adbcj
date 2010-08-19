@@ -26,6 +26,9 @@ public class PgFieldType {
 	public static final int CHAR = 1042;
 	public static final int VARCHAR = 1043;
 	public static final int DATE = 1082;
+	public static final int TIMESTAMP = 1114;
+	public static final int TIMESTAMP_WITH_TIME_ZONE = 1184;
+	public static final int TEXT = 25;
 	
 	private PgFieldType() {}
 }
