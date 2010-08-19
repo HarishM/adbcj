@@ -4,9 +4,9 @@ import org.adbcj.DbFuture;
 import org.adbcj.DbException;
 import org.adbcj.support.DecoderInputStream;
 import org.adbcj.support.DefaultDbFuture;
-import org.adbcj.postgresql.codec.AbstractConnectionManager;
+import org.adbcj.postgresql.codec.AbstractPgConnectionManager;
 import org.adbcj.postgresql.codec.ConnectionState;
-import org.adbcj.postgresql.codec.AbstractConnection;
+import org.adbcj.postgresql.codec.AbstractPgConnection;
 import org.adbcj.postgresql.codec.ProtocolHandler;
 import org.adbcj.postgresql.codec.backend.BackendMessageDecoder;
 import org.adbcj.postgresql.codec.backend.AbstractBackendMessage;
@@ -45,13 +45,11 @@ import java.io.InputStream;
 /**
  * @author Mike Heath
  */
-public class NettyConnectionManager extends AbstractConnectionManager {
+public class PgConnectionManager extends AbstractPgConnectionManager {
 
-	private static final Logger logger = LoggerFactory.getLogger(NettyConnectionManager.class);
-
-	private static final String QUEUE_HANDLER = NettyConnectionManager.class.getName() + ".queueHandler";
-	private static final String ENCODER = NettyConnectionManager.class.getName() + ".encoder";
-	private static final String DECODER = NettyConnectionManager.class.getName() + ".decoder";
+	private static final String QUEUE_HANDLER = PgConnectionManager.class.getName() + ".queueHandler";
+	private static final String ENCODER = PgConnectionManager.class.getName() + ".encoder";
+	private static final String DECODER = PgConnectionManager.class.getName() + ".decoder";
 
 	private final ExecutorService executorService;
 	private final ClientBootstrap bootstrap;
@@ -61,13 +59,13 @@ public class NettyConnectionManager extends AbstractConnectionManager {
 
 	private volatile boolean pipeliningEnabled = true;
 
-	public NettyConnectionManager(String host, int port, String username, String password, String database, Properties properties, ChannelFactory channelFactory) {
+	public PgConnectionManager(String host, int port, String username, String password, String database, Properties properties, ChannelFactory channelFactory) {
 		super(username, password, database);
 		executorService = null;
 		bootstrap = initBootstrap(channelFactory, host, port);
 	}
 
-	public NettyConnectionManager(String host, int port, String username, String password, String database, Properties properties) {
+	public PgConnectionManager(String host, int port, String username, String password, String database, Properties properties) {
 		super(username, password, database);
 		executorService = Executors.newCachedThreadPool();
 		ChannelFactory channelFactory = new NioClientSocketChannelFactory(executorService, executorService);
@@ -84,7 +82,6 @@ public class NettyConnectionManager extends AbstractConnectionManager {
 
 		return bootstrap;
 	}
-
 
 	@Override
 	public DbFuture<org.adbcj.Connection> connect() {
@@ -144,9 +141,9 @@ public class NettyConnectionManager extends AbstractConnectionManager {
 				@Override
 				public void operationComplete(ChannelFuture future) throws Exception {
 					Channel channel = future.getChannel();
-					Connection connection = new Connection(NettyConnectionManager.this, channel, PostgresqlConnectFuture.this);
+					Connection connection = new Connection(PgConnectionManager.this, channel, PostgresqlConnectFuture.this);
 					ConnectionState state = connection.getConnectionState();
-					ProtocolHandler protocolHandler = new ProtocolHandler(NettyConnectionManager.this);
+					ProtocolHandler protocolHandler = new ProtocolHandler(PgConnectionManager.this);
 
 					ChannelPipeline pipeline = channel.getPipeline();
 					pipeline.addLast(ENCODER, new Encoder(state));
@@ -167,12 +164,12 @@ public class NettyConnectionManager extends AbstractConnectionManager {
 
 }
 
-class Connection extends AbstractConnection {
+class Connection extends AbstractPgConnection {
 
 	private final Channel channel;
 	private final DefaultDbFuture<org.adbcj.Connection> connectFuture;
 
-	Connection(AbstractConnectionManager connectionManager, Channel channel, DefaultDbFuture<org.adbcj.Connection> connectFuture) {
+	Connection(AbstractPgConnectionManager connectionManager, Channel channel, DefaultDbFuture<org.adbcj.Connection> connectFuture) {
 		super(connectionManager);
 		this.channel = channel;
 		this.connectFuture = connectFuture;

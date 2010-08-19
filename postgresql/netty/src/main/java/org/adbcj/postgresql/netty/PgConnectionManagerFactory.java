@@ -11,10 +11,10 @@ import java.net.URISyntaxException;
 /**
  * @author Mike Heath
  */
-public class NettyConnectionManagerFactory implements ConnectionManagerFactory {
+public class PgConnectionManagerFactory implements ConnectionManagerFactory {
 
 	public static final String PROTOCOL = "postgresql-netty";
-	public static final int DEFAULT_PORT = 5432;
+	public static final int DEFAULT_PORT = 5432;	
 
 	public ConnectionManager createConnectionManager(String url, String username, String password, Properties properties) throws DbException {
 		try {
@@ -32,7 +32,7 @@ public class NettyConnectionManagerFactory implements ConnectionManagerFactory {
 			}
 			String schema = uri.getPath().substring(1);
 
-			return new NettyConnectionManager(host, port, username, password, schema, properties);
+			return new PgConnectionManager(host, port, username, password, schema, properties);
 		} catch (URISyntaxException e) {
 			throw new DbException(e);
 		}
@@ -42,5 +42,4 @@ public class NettyConnectionManagerFactory implements ConnectionManagerFactory {
 	public boolean canHandle(String protocol) {
 		return PROTOCOL.equals(protocol);
 	}
-
 }
