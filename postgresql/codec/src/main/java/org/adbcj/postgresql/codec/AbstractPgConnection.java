@@ -41,32 +41,32 @@ import org.adbcj.support.DefaultDbFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class AbstractConnection extends AbstractDbSession implements Connection {
+public abstract class AbstractPgConnection extends AbstractDbSession implements Connection {
 
-	private final Logger logger = LoggerFactory.getLogger(AbstractConnection.class);
+	private final Logger logger = LoggerFactory.getLogger(AbstractPgConnection.class);
 
-	private final AbstractConnectionManager connectionManager;
+	private final AbstractPgConnectionManager connectionManager;
 	private final ConnectionState connectionState;
 	private Request<Void> closeRequest; // Access synchronized on lock
-        private static final String stmtName = "Prepare"; //Prepare Statement Initial name
-
+	private static final String stmtName = "Prepare"; 
+	
 	private volatile int pid;
 	private volatile int key;
-        
-        private int paramCount = 0; // Parameter Count
 
+	private int paramCount = 0;
+	
 	// Constant Messages
-	private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
+    private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
 	private static final BindMessage DEFAULT_BIND = new BindMessage();
 	private static final DescribeMessage DEFAULT_DESCRIBE = DescribeMessage.createDescribePortalMessage(null);
-
-	public AbstractConnection(AbstractConnectionManager connectionManager) {
+	
+	public AbstractPgConnection(AbstractPgConnectionManager connectionManager) {
 		super(connectionManager.isPipeliningEnabled());
 		this.connectionManager = connectionManager;
 		this.connectionState = new ConnectionState(connectionManager.getDatabase());
 	}
 
-	public AbstractConnectionManager getConnectionManager() {
+	public AbstractPgConnectionManager getConnectionManager() {
 		return connectionManager;
 	}
 
@@ -237,15 +237,13 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 				while(paramCount > 0)
 					parameter[--paramCount] = 0;
 				
-				ParseMessage parse = new ParseMessage(query, stmtName+preparedStatement.getId(),
-                                                                      parameter);
-				write(new AbstractFrontendMessage[] { 
-                                     parse,
-  			 	     DescribeMessage.createDescribeStatementMessage(stmtName+preparedStatement.getId()),
-			             SimpleFrontendMessage.SYNC
-				});
+				ParseMessage parse = new ParseMessage(query, stmtName+preparedStatement.getId(), parameter);
+				write(new AbstractFrontendMessage[] {
+						parse,
+						DescribeMessage.createDescribeStatementMessage(stmtName+preparedStatement.getId()),
+						SimpleFrontendMessage.SYNC
+					});
 			}
-
 			@Override
 			public String toString() {
 				return "Prepare request: " + sql;
@@ -264,7 +262,7 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 		}
 		return Query;
 	}
-
+	
 	public DbSessionFuture<PreparedStatement> prepareStatement(Object key, String sql) {
 		// TODO Implement prepareStatement
 		throw new IllegalStateException();
@@ -315,8 +313,8 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 	// ================================================================================================================
 
 	@Override
-	protected <E> void enqueueRequest(Request<E> request) {
-		super.enqueueRequest(request);
+	public <E> DbSessionFuture<E> enqueueTransactionalRequest(Request<E> request){
+		return super.enqueueTransactionalRequest(request);
 	}
 
 	@Override
@@ -328,7 +326,7 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 		return pid;
 	}
 
-	public void setPid(int pid) {
+	protected void setPid(int pid) {
 		this.pid = pid;
 	}
 
@@ -336,7 +334,7 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 		return key;
 	}
 
-	public void setKey(int key) {
+	protected void setKey(int key) {
 		this.key = key;
 	}
 

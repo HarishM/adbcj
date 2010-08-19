@@ -20,24 +20,24 @@ import java.util.Map;
 
 import org.adbcj.DbException;
 import org.adbcj.postgresql.codec.ErrorField;
-import org.adbcj.postgresql.codec.AbstractConnection;
+import org.adbcj.postgresql.codec.AbstractPgConnection;
 
 public class PgException extends DbException {
 	private static final long serialVersionUID = 1L;
 
 	private final Map<ErrorField, String> fields;
 	
-	public PgException(AbstractConnection connection, Map<ErrorField, String> fields) {
+	public PgException(AbstractPgConnection connection, Map<ErrorField, String> fields) {
 		super(connection);
 		this.fields = fields;
 	}
 
-	public PgException(AbstractConnection connection, String message) {
+	public PgException(AbstractPgConnection connection, String message) {
 		super(connection, message);
 		this.fields = null;
 	}
 
-	public PgException(AbstractConnection connection, String message, Map<ErrorField, String> fields) {
+	public PgException(AbstractPgConnection connection, String message, Map<ErrorField, String> fields) {
 		super(connection, message);
 		this.fields = fields;
 	}
@@ -47,8 +47,8 @@ public class PgException extends DbException {
 	}
 	
 	@Override
-	public AbstractConnection getSession() {
-		return (AbstractConnection)super.getSession();
+	public AbstractPgConnection getSession() {
+		return (AbstractPgConnection)super.getSession();
 	}
 	
 }

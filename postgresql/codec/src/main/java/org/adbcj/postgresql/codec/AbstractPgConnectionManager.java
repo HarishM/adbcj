@@ -18,13 +18,13 @@ package org.adbcj.postgresql.codec;
 
 import org.adbcj.ConnectionManager;
 
-public abstract class AbstractConnectionManager implements ConnectionManager {
+public abstract class AbstractPgConnectionManager implements ConnectionManager {
 
 	private final String username;
 	private final String password;
 	private final String database;
 
-	public AbstractConnectionManager(String username, String password, String database) {
+	public AbstractPgConnectionManager(String username, String password, String database) {
 		this.username = username;
 		this.password = password;
 		this.database = database;
