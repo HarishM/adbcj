@@ -25,7 +25,7 @@ public interface PreparedStatement {
 	
 	String getNativeSQL();
 	
-	DbFuture<ResultSet> executeQuery(Object... params);
+	<T extends ResultSet>DbFuture<T> executeQuery(Object... params);
 	
 	DbFuture<ResultSet> executeQuery(Map<Object, Object> params);
 	
@@ -33,4 +33,6 @@ public interface PreparedStatement {
 	
 	DbFuture<Result> executeUpdate(Map<Object, Object> params);
 	
+        int getId();
+
 }
