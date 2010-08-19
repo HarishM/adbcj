@@ -17,17 +17,17 @@
 package org.adbcj.postgresql.mina;
 
 import org.adbcj.support.DefaultResultSet;
-import org.adbcj.postgresql.codec.AbstractConnection;
+import org.adbcj.postgresql.codec.AbstractPgConnection;
 
 public class PgResultSet extends DefaultResultSet {
 
-	public PgResultSet(AbstractConnection connection) {
+	public PgResultSet(AbstractPgConnection connection) {
 		super(connection);
 	}
 	
 	@Override
-	public AbstractConnection getSession() {
-		return (AbstractConnection)super.getSession();
+	public AbstractPgConnection getSession() {
+		return (AbstractPgConnection)super.getSession();
 	}
 
 }

@@ -17,7 +17,7 @@
 package org.adbcj.postgresql.mina;
 
 import org.adbcj.postgresql.codec.backend.AbstractBackendMessage;
-import org.adbcj.postgresql.codec.AbstractConnection;
+import org.adbcj.postgresql.codec.AbstractPgConnection;
 import org.adbcj.postgresql.codec.ProtocolHandler;
 import org.adbcj.postgresql.mina.MinaConnectionManager;
 import org.adbcj.postgresql.mina.MinaConnection;
@@ -47,7 +47,7 @@ public class IoHandler extends IoHandlerAdapter {
 		logger.debug("sessionOpened");
 
 		// Send start message to backend
-		AbstractConnection connection = IoSessionUtil.getConnection(session);
+		AbstractPgConnection connection = IoSessionUtil.getConnection(session);
 		protocolHandler.connectionOpened(connection);
 
 	}
@@ -55,7 +55,7 @@ public class IoHandler extends IoHandlerAdapter {
 	@Override
 	public void sessionClosed(IoSession session) throws Exception {
 		logger.debug("IoSession closed");
-		AbstractConnection connection = IoSessionUtil.getConnection(session);
+		AbstractPgConnection connection = IoSessionUtil.getConnection(session);
 		protocolHandler.closeConnection(connection);
 	}
 

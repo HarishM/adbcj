@@ -1,6 +1,6 @@
 package org.adbcj.postgresql.mina;
 
-import org.adbcj.postgresql.codec.AbstractConnectionManager;
+import org.adbcj.postgresql.codec.AbstractPgConnectionManager;
 import org.adbcj.postgresql.codec.backend.BackendMessageDecoder;
 import org.adbcj.postgresql.codec.backend.AbstractBackendMessage;
 import org.adbcj.postgresql.codec.frontend.FrontendMessageEncoder;
@@ -35,10 +35,10 @@ import java.io.OutputStream;
 /**
  * @author Mike Heath
  */
-public class MinaConnectionManager extends AbstractConnectionManager {
-	public static final String CODEC_NAME = AbstractConnectionManager.class.getName() + ".codec";
+public class MinaConnectionManager extends AbstractPgConnectionManager {
+	public static final String CODEC_NAME = AbstractPgConnectionManager.class.getName() + ".codec";
 
-	private final Logger logger = LoggerFactory.getLogger(AbstractConnectionManager.class);
+	private final Logger logger = LoggerFactory.getLogger(AbstractPgConnectionManager.class);
 
 	private final NioSocketConnector socketConnector;
 
