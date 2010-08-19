@@ -175,4 +175,30 @@ public class DecoderInputStream extends InputStream {
 		return new String(buffer, 0, pos, charset);
 	}
 
+	public StringBuffer readStringBuffer(int length, Charset charset) throws IOException {
+		
+		byte[] buffer = new byte[length];
+		int pos = 0;
+		while (pos < length) {
+			int b = read();
+			if (b < 0) {
+				throw new IOException("End of stream, expected " + (length - pos) + " characters");
+			}
+			buffer[pos++] = (byte)b;
+		}
+		if(length <= Integer.MAX_VALUE)
+			return new StringBuffer(new String(buffer, 0, pos, charset));
+		else{
+			int temp = length / Integer.MAX_VALUE;
+			StringBuffer text = new StringBuffer(new String(buffer, 0, Integer.MAX_VALUE-1, charset));
+			int initialPos = Integer.MAX_VALUE;
+			
+			while(temp-- > 0){
+				text.append(new String(buffer, initialPos, ( temp>0 ? initialPos+Integer.MAX_VALUE-1 : length-1), charset));
+				initialPos += Integer.MAX_VALUE;
+			}
+			return text;
+		}
+	}
+
 }
