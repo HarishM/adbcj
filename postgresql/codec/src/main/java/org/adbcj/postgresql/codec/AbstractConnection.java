@@ -19,6 +19,7 @@ package org.adbcj.postgresql.codec;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.adbcj.Connection;
@@ -47,9 +48,12 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 	private final AbstractConnectionManager connectionManager;
 	private final ConnectionState connectionState;
 	private Request<Void> closeRequest; // Access synchronized on lock
+        private static final String stmtName = "Prepare"; //Prepare Statement Initial name
 
 	private volatile int pid;
 	private volatile int key;
+        
+        private int paramCount = 0; // Parameter Count
 
 	// Constant Messages
 	private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
@@ -219,9 +223,46 @@ public abstract class AbstractConnection extends AbstractDbSession implements Co
 		});
 	}
 
-	public DbSessionFuture<PreparedStatement> prepareStatement(String sql) {
-		// TODO Implement prepareStatement
-		throw new IllegalStateException();
+	public DbSessionFuture<PreparedStatement> prepareStatement(final String sql) {
+		checkClosed();
+		final PreparedStatement preparedStatement = new PgPreparedStatement(this, parseQuery(sql));
+		
+		return enqueueTransactionalRequest(new Request<PreparedStatement>(null, preparedStatement) {
+			@Override
+			public void execute() throws Exception {
+				logger.debug("Issuing prepare query: {}", sql);
+				String query = parseQuery(sql);
+
+				int parameter[] = new int[paramCount];
+				while(paramCount > 0)
+					parameter[--paramCount] = 0;
+				
+				ParseMessage parse = new ParseMessage(query, stmtName+preparedStatement.getId(),
+                                                                      parameter);
+				write(new AbstractFrontendMessage[] { 
+                                     parse,
+  			 	     DescribeMessage.createDescribeStatementMessage(stmtName+preparedStatement.getId()),
+			             SimpleFrontendMessage.SYNC
+				});
+			}
+
+			@Override
+			public String toString() {
+				return "Prepare request: " + sql;
+			}
+		});
+	}
+	
+	private String parseQuery(String query){
+		StringTokenizer token = new StringTokenizer(query, "?",true);
+		String Query = token.nextToken();
+		paramCount=0;
+		
+		while(token.hasMoreTokens()){
+			token.nextToken();
+			Query += "$" + (++paramCount) + (token.hasMoreTokens()?token.nextToken():"");
+		}
+		return Query;
 	}
 
 	public DbSessionFuture<PreparedStatement> prepareStatement(Object key, String sql) {
