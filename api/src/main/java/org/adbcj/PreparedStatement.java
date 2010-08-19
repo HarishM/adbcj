@@ -22,17 +22,20 @@ import java.util.Map;
 public interface PreparedStatement {
 
 	List<Object> getParameterKeys();
-	
+
 	String getNativeSQL();
-	
+
 	<T extends ResultSet>DbFuture<T> executeQuery(Object... params);
-	
+
 	DbFuture<ResultSet> executeQuery(Map<Object, Object> params);
-	
+
 	DbFuture<Result> executeUpdate(Object... params);
-	
+
 	DbFuture<Result> executeUpdate(Map<Object, Object> params);
 	
-        int getId();
-
+	DbSession getSession();
+	
+	DbFuture<Void> close();
+	
+	int getId();
 }
