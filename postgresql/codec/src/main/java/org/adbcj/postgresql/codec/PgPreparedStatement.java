@@ -1,6 +1,7 @@
 package org.adbcj.postgresql.codec;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.adbcj.DbFuture;
 import org.adbcj.DbSession;
@@ -26,9 +27,10 @@ public class PgPreparedStatement extends AbstractPreparedStatement{
 	private final Logger logger = LoggerFactory.getLogger(PgPreparedStatement.class);
 	private int paramCount;
 	private int[] paramOID;
-	private static int prepareCount = 0;
-	private String stmtName = "Prepare";
-	private int Id;
+	private final String stmtName;
+	
+	private static AtomicInteger idCounter = new AtomicInteger(0);
+	private static final String PREPARE = "Prepare_"; 
 	
 	// Constant Messages
     private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
@@ -36,8 +38,7 @@ public class PgPreparedStatement extends AbstractPreparedStatement{
 	
 	public PgPreparedStatement(DbSession session, String nativeSQL) {
 		super(session, nativeSQL);
-		this.Id = ++prepareCount;
-		this.stmtName += prepareCount; 
+		this.stmtName = PREPARE + idCounter.incrementAndGet(); 
 	}
 
 	@SuppressWarnings("unchecked")
@@ -174,10 +175,6 @@ public class PgPreparedStatement extends AbstractPreparedStatement{
 	
 	public int[] getParamOID(){
 		return this.paramOID;
-	}
-	
-	public int getId(){
-		return this.Id;
 	}
 	
 	public DbFuture<Void> close(){

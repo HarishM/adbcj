@@ -36,6 +36,5 @@ public interface PreparedStatement {
 	DbSession getSession();
 	
 	DbFuture<Void> close();
-	
-	int getId();
+
 }

@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.adbcj.Connection;
@@ -48,7 +49,7 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 	private final AbstractPgConnectionManager connectionManager;
 	private final ConnectionState connectionState;
 	private Request<Void> closeRequest; // Access synchronized on lock
-	private static final String stmtName = "Prepare"; 
+	 
 	
 	private volatile int pid;
 	private volatile int key;
@@ -223,9 +224,13 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 		});
 	}
 
+	private static final String PREPARE = "Prepare_";
+	private static AtomicInteger idCounter = new AtomicInteger(0);
+	
 	public DbSessionFuture<PreparedStatement> prepareStatement(final String sql) {
 		checkClosed();
 		final PreparedStatement preparedStatement = new PgPreparedStatement(this, parseQuery(sql));
+		final int Id = idCounter.incrementAndGet();
 		
 		return enqueueTransactionalRequest(new Request<PreparedStatement>(null, preparedStatement) {
 			@Override
@@ -237,10 +242,10 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 				while(paramCount > 0)
 					parameter[--paramCount] = 0;
 				
-				ParseMessage parse = new ParseMessage(query, stmtName+preparedStatement.getId(), parameter);
+				ParseMessage parse = new ParseMessage(query, PREPARE + Id, parameter);
 				write(new AbstractFrontendMessage[] {
 						parse,
-						DescribeMessage.createDescribeStatementMessage(stmtName+preparedStatement.getId()),
+						DescribeMessage.createDescribeStatementMessage(PREPARE + Id),
 						SimpleFrontendMessage.SYNC
 					});
 			}
