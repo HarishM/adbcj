@@ -50,11 +50,8 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 	private final ConnectionState connectionState;
 	private Request<Void> closeRequest; // Access synchronized on lock
 	 
-	
 	private volatile int pid;
 	private volatile int key;
-
-	private int paramCount = 0;
 	
 	// Constant Messages
     private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
@@ -229,18 +226,21 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 	
 	public DbSessionFuture<PreparedStatement> prepareStatement(final String sql) {
 		checkClosed();
-		final PreparedStatement preparedStatement = new PgPreparedStatement(this, parseQuery(sql));
+		
 		final int Id = idCounter.incrementAndGet();
+		final AtomicInteger paramCount = new AtomicInteger(0);
+		final String query = parseQuery(sql, paramCount);
+		
+		PreparedStatement preparedStatement = new PgPreparedStatement(this, query, Id);
 		
 		return enqueueTransactionalRequest(new Request<PreparedStatement>(null, preparedStatement) {
 			@Override
 			public void execute() throws Exception {
 				logger.debug("Issuing prepare query: {}", sql);
-				String query = parseQuery(sql);
 
-				int parameter[] = new int[paramCount];
-				while(paramCount > 0)
-					parameter[--paramCount] = 0;
+				int parameter[] = new int[paramCount.get()];
+				while(paramCount.get() > 0)
+					parameter[paramCount.decrementAndGet()] = 0;
 				
 				ParseMessage parse = new ParseMessage(query, PREPARE + Id, parameter);
 				write(new AbstractFrontendMessage[] {
@@ -256,14 +256,13 @@ public abstract class AbstractPgConnection extends AbstractDbSession implements 
 		});
 	}
 	
-	private String parseQuery(String query){
+	private String parseQuery(String query, AtomicInteger paramCount){
 		StringTokenizer token = new StringTokenizer(query, "?",true);
 		String Query = token.nextToken();
-		paramCount=0;
 		
 		while(token.hasMoreTokens()){
 			token.nextToken();
-			Query += "$" + (++paramCount) + (token.hasMoreTokens()?token.nextToken():"");
+			Query += "$" + paramCount.incrementAndGet() + (token.hasMoreTokens()?token.nextToken():"");
 		}
 		return Query;
 	}

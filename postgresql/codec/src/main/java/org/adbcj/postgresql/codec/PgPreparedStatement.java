@@ -1,7 +1,6 @@
 package org.adbcj.postgresql.codec;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.adbcj.DbFuture;
 import org.adbcj.DbSession;
@@ -29,16 +28,15 @@ public class PgPreparedStatement extends AbstractPreparedStatement{
 	private int[] paramOID;
 	private final String stmtName;
 	
-	private static AtomicInteger idCounter = new AtomicInteger(0);
 	private static final String PREPARE = "Prepare_"; 
 	
 	// Constant Messages
     private static final ExecuteMessage DEFAULT_EXECUTE = new ExecuteMessage();
 	private static final DescribeMessage DEFAULT_DESCRIBE = DescribeMessage.createDescribePortalMessage(null);
 	
-	public PgPreparedStatement(DbSession session, String nativeSQL) {
+	public PgPreparedStatement(DbSession session, String nativeSQL, int Id) {
 		super(session, nativeSQL);
-		this.stmtName = PREPARE + idCounter.incrementAndGet(); 
+		this.stmtName = PREPARE + Id; 
 	}
 
 	@SuppressWarnings("unchecked")
